@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>康軒 B5L2 配對複習遊戲</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#f0f4f8; margin:0; padding:20px; text-align:center; }
+  h1 { color:#2c3e50; }
+  .nav-tabs { margin-bottom:20px; }
+  .tab-btn { padding:10px 20px; margin:0 5px; font-size:16px; font-weight:bold; border:none; background:#cbd5e1; cursor:pointer; border-radius:8px 8px 0 0; }
+  .tab-btn.active { background:#3b82f6; color:#fff; }
+  .game-board { display:flex; justify-content:space-around; gap:16px; max-width:900px; margin:0 auto; background:#fff; padding:20px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,.1); }
+  .column { width:47%; }
+  .col-title { font-size:14px; color:#64748b; margin-bottom:6px; }
+  #bank { min-height:60px; border-radius:8px; }
+  .card { display:inline-block; background:#e2e8f0; border:2px solid #94a3b8; border-radius:8px; padding:10px 14px; margin:6px; font-size:16px; font-weight:bold; cursor:grab; user-select:none; }
+  .card.selected { background:#fde68a; border-color:#f59e0b; }
+  .dropzone { background:#f8fafc; border:2px dashed #cbd5e1; border-radius:8px; padding:8px 12px; margin:10px 0; min-height:48px; font-size:16px; display:flex; align-items:center; justify-content:space-between; gap:8px; text-align:left; }
+  .dropzone .card { margin:0; cursor:pointer; }
+  .dropzone.over { border-color:#3b82f6; background:#eff6ff; }
+  .correct { background:#86efac !important; border-color:#22c55e !important; color:#14532d; }
+  .wrong { background:#fca5a5 !important; border-color:#ef4444 !important; }
+  .btn-row { margin-top:20px; }
+  .btn { padding:12px 24px; font-size:18px; font-weight:bold; color:#fff; border:none; border-radius:8px; cursor:pointer; margin:0 6px; }
+  .btn-check { background:#22c55e; }
+  .btn-reset { background:#64748b; }
+  #score { margin-top:14px; font-size:20px; font-weight:bold; color:#2c3e50; min-height:28px; }
+  #hint { font-size:14px; color:#64748b; margin-top:8px; }
+  .group-title { font-size:13px; color:#64748b; text-align:left; margin:10px 6px 0; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<h1>康軒第五冊第二課：單字片語配對遊戲</h1>
+
+<div class="nav-tabs">
+  <button class="tab-btn active" onclick="switchPage(0)">Page 1: 介系詞配對</button>
+  <button class="tab-btn" onclick="switchPage(1)">Page 2: 情緒形容詞</button>
+  <button class="tab-btn" onclick="switchPage(2)">Page 3: 重點單字句型</button>
+</div>
+
+<div class="game-board">
+  <div class="column" id="left-column"></div>
+  <div class="column">
+    <div class="col-title" id="bank-title"></div>
+    <div id="bank"></div>
+  </div>
+</div>
+
+<div class="btn-row">
+  <button class="btn btn-check" onclick="checkAnswers()">檢查答案</button>
+  <button class="btn btn-reset" onclick="loadPage()">重來</button>
+</div>
+<div id="score"></div>
+<div id="hint">拖曳卡片到空格；也可以先點卡片再點空格。點空格裡的卡片可取消。</div>
+
+<script>
+const gameData = [
+  // Page 1: 介系詞（第 1 頁的介系詞可重複使用）
+  [
+    { left: "be bored...", right: "with" },
+    { left: "be excited...", right: "about" },
+    { left: "be interested...", right: "in" },
+    { left: "be scared...", right: "of" },
+    { left: "be surprised...", right: "at" },
+    { left: "be tired...", right: "of" },
+    { left: "be touched...", right: "by" },
+    { left: "be worried...", right: "about" }
+  ],
+  // Page 2: -ing / -ed
+  [
+    { left: "boring", right: "(事物/人) 令人無聊的" },
+    { left: "bored", right: "(心理狀態) 感到厭煩的" },
+    { left: "interesting", right: "(事物/人)令人覺得有趣的" },
+    { left: "interested", right: "(心理狀態) 感到有趣的" },
+    { left: "tiring", right: "(事物) 令人疲倦的" },
+    { left: "tired", right: "(心理狀態) 感到疲倦的" },
+    { left: "exciting", right: "(事物)令人興奮的" },
+    { left: "excited", right: "(心理狀態) 感到興奮的" },
+    { left: "surprising", right: "(事物) 令人驚訝的" },
+    { left: "surprised", right: "(心理狀態) 感到驚訝的" },
+    
+  ],
+  // Page 3: 單字與句型
+  [
+    { left: "delivery", right: "外送／運送" },
+    { left: "discount", right: "折扣" },
+    { left: "uniform", right: "制服" },
+    { left: "couch", right: "沙發" },
+    { left: "tip", right: "(給)小費" },
+    { left: "location", right: "位置" },
+    { left: "food delivery", right: "外送服務" },
+    { left: "pie chart", right: "圓餅圖" },
+    { left: "I think that...", right: "我認為..." },
+    { left: "We believe that...", right: "我們相信..." },
+    { left: "I'm sure that...", right: "我確信..." },
+    { left: "It is true that...", right: "...是真的" }
+  ]
+];
+const reusablePages = [true, false, false];
+
+let currentPage = 0, cards = [], placed = [], selected = null, checked = false;
+
+const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+
+function loadPage() {
+  const items = gameData[currentPage];
+  const texts = reusablePages[currentPage]
+    ? [...new Set(items.map(i => i.right))]   // 重複的介系詞只留一張，可重複使用
+    : items.map(i => i.right);
+  const grp = t => items.find(i => i.right === t).left.includes('...') ? 'p' : 'w';
+  cards = shuffle(texts.map((t, i) => ({ id: 'c' + i, text: t, g: grp(t) })));
+  placed = items.map(() => null);
+  selected = null; checked = false;
+  document.getElementById('score').textContent = '';
+  render();
+}
+
+function render() {
+  const items = gameData[currentPage];
+  const reusable = reusablePages[currentPage];
+  const left = document.getElementById('left-column');
+  left.innerHTML = '';
+
+  items.forEach((item, i) => {
+    const zone = document.createElement('div');
+    zone.className = 'dropzone';
+    if (checked && placed[i]) zone.classList.add(placed[i].text === item.right ? 'correct' : 'wrong');
+    zone.innerHTML = `<span>${item.left}</span>`;
+    if (placed[i]) {
+      const c = makeCard(placed[i], i);
+      c.onclick = e => { e.stopPropagation(); placed[i] = null; changed(); };
+      zone.appendChild(c);
+    }
+    zone.ondragover = e => { e.preventDefault(); zone.classList.add('over'); };
+    zone.ondragleave = () => zone.classList.remove('over');
+    zone.ondrop = e => { e.preventDefault(); handleDrop(e, i); };
+    zone.onclick = () => { if (selected) { place(selected, i, null); selected = null; } };
+    left.appendChild(zone);
+  });
+
+  const bank = document.getElementById('bank');
+  bank.innerHTML = '';
+  document.getElementById('bank-title').textContent =
+    reusable ? '選項（可重複使用）' : '選項（每張只能用一次）';
+  const visible = cards.filter(c => reusable || !placed.includes(c));
+    if (currentPage === 2) visible.sort((a, b) => a.g === b.g ? 0 : (a.g === 'w' ? -1 : 1));
+    let lastG = null;
+    visible.forEach(c => {
+        if (currentPage === 2 && c.g !== lastG) {
+            const t = document.createElement('div');
+            t.className = 'group-title';
+            t.textContent = c.g === 'w' ? '單字' : '句型';
+            bank.appendChild(t);
+            lastG = c.g;
+        }
+        const el = makeCard(c, null);
+        if (selected && selected.id === c.id) el.classList.add('selected');
+        el.onclick = () => { selected = (selected && selected.id === c.id) ? null : c; render(); };
+        bank.appendChild(el);
+    });
+  bank.ondragover = e => e.preventDefault();
+  bank.ondrop = e => {
+    e.preventDefault();
+    const { from } = JSON.parse(e.dataTransfer.getData('text'));
+    if (from !== null) { placed[from] = null; changed(); }
+  };
+}
+
+function makeCard(card, from) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.textContent = card.text;
+  el.draggable = true;
+  el.ondragstart = e => e.dataTransfer.setData('text', JSON.stringify({ id: card.id, from }));
+  return el;
+}
+
+function handleDrop(e, to) {
+  const { id, from } = JSON.parse(e.dataTransfer.getData('text'));
+  const card = cards.find(c => c.id === id);
+  if (card) place(card, to, from);
+}
+
+function place(card, to, from) {
+  if (from !== null && from !== undefined) placed[from] = placed[to]; // 從別的空格拖來：互換
+  placed[to] = card;
+  changed();
+}
+
+function changed() { checked = false; document.getElementById('score').textContent = ''; render(); }
+
+function switchPage(i) {
+  currentPage = i;
+  document.querySelectorAll('.tab-btn').forEach((b, idx) => b.classList.toggle('active', idx === i));
+  loadPage();
+}
+
+function checkAnswers() {
+  const items = gameData[currentPage];
+  checked = true;
+  render();
+  const right = items.filter((it, i) => placed[i] && placed[i].text === it.right).length;
+  const empty = placed.filter(p => !p).length;
+  document.getElementById('score').textContent =
+    `答對 ${right} / ${items.length}` + (empty ? `（還有 ${empty} 題沒放）` : '');
+}
+
+loadPage();
+</script>
+</body>
+</html>
